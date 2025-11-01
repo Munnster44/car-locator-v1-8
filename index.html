@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Parked Car Locator v1.8 (Single-file)</title>
+<title>Parked Car Locator v1.8a (Single-file)</title>
 
-<!-- The manifest is generated and attached at runtime as a Blob URL. -->
+<!-- Inline manifest will be attached at runtime -->
 <link id="manifestLink" rel="manifest" href="data:application/json,{}">
 
 <style>
@@ -31,47 +31,45 @@
     border-bottom:1px solid rgba(255,255,255,.08);
     backdrop-filter:blur(6px);
   }
-  h1{font-size:20px;margin:6px 0 2px}
-  .sub{font-size:12px;color:var(--muted)}
-  #map{height:46vh;min-height:260px;width:100%}
+  h1{font-size:20px; margin:6px 0 2px}
+  .sub{font-size:12px; color:var(--muted)}
+  #map{height:46vh; min-height:260px; width:100%}
 
-  .grid{display:grid;gap:10px;padding:12px}
+  .grid{display:grid; gap:10px; padding:12px}
   @media(min-width:760px){ .grid{grid-template-columns:1.2fr 1fr} #map{height:55vh} }
 
-  .card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
-  button,input[type="number"],input[type="text"],textarea{
-    font:inherit;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0e1624;color:#eaf2ff;padding:10px 12px;
+  .card{background:var(--card); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px}
+  .row{display:flex; gap:10px; flex-wrap:wrap}
+  button, input[type="number"], input[type="text"], textarea{
+    font:inherit; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#0e1624; color:#eaf2ff; padding:10px 12px;
   }
-  button{cursor:pointer;border-color:transparent;background:linear-gradient(180deg,#1b8fff,#1462ff);box-shadow:0 6px 20px rgba(20,98,255,.25)}
-  button.secondary{background:#12223a;border:1px solid rgba(255,255,255,.12);box-shadow:none}
+  button{cursor:pointer; border-color:transparent; background:linear-gradient(180deg,#1b8fff,#1462ff); box-shadow:0 6px 20px rgba(20,98,255,.25)}
+  button.secondary{background:#12223a; border:1px solid rgba(255,255,255,.12); box-shadow:none}
   button.warn{background:linear-gradient(180deg,#ff7b7b,#e05252)}
-  button:disabled{opacity:.6;cursor:not-allowed}
+  button:disabled{opacity:.6; cursor:not-allowed}
 
-  .stack{display:grid;gap:8px}
-  .kv{display:grid;grid-template-columns:140px 1fr;gap:6px;align-items:center}
+  .stack{display:grid; gap:8px}
+  .kv{display:grid; grid-template-columns:140px 1fr; gap:6px; align-items:center}
   .muted{color:var(--muted)}
-  .big{font-size:28px;font-weight:700}
+  .big{font-size:28px; font-weight:700}
 
-  /* >>> v1.8: More visible pointer <<< */
-  .compass{display:flex;align-items:center;gap:14px}
+  /* Compass — improved visibility */
+  .compass{display:flex; flex-direction:column; align-items:center; gap:8px}
   .needle{
-    width:64px;height:64px;border-radius:50%;
-    position:relative;display:inline-grid;place-items:center;
-    background:#0f1a2b;                      /* darker disk */
-    border:2px solid rgba(255,255,255,.25);  /* brighter ring */
+    width:64px; height:64px; border-radius:50%;
+    position:relative; display:inline-grid; place-items:center;
+    background:#0f1a2b; border:2px solid rgba(255,255,255,.25);
     box-shadow:0 0 0 4px rgba(20,98,255,.25), 0 8px 30px rgba(20,98,255,.35);
   }
-  .needle::before{ /* contrasting background wedge */
+  .needle::before{
     content:""; position:absolute; width:80%; height:80%; border-radius:50%;
     background:radial-gradient(circle at 50% 55%, rgba(255,255,255,.12), rgba(255,255,255,0) 60%);
     z-index:0;
   }
-  .needle::after{ /* arrow */
+  .needle::after{ /* TIP points toward your car */
     content:""; width:4px; height:28px; background:var(--accent-2);
     position:absolute; top:6px; left:50%; transform:translateX(-50%);
-    border-radius:2px;
-    box-shadow:0 0 10px rgba(142,255,163,.5);
+    border-radius:2px; box-shadow:0 0 10px rgba(142,255,163,.5);
   }
   .needle .cap{
     position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
@@ -79,9 +77,9 @@
     box-shadow:0 0 8px rgba(255,255,255,.6);
   }
 
-  .photo-preview{max-width:100%;max-height:180px;display:block;margin-top:6px;border-radius:10px;border:1px solid rgba(255,255,255,.08)}
+  .photo-preview{max-width:100%; max-height:180px; display:block; margin-top:6px; border-radius:10px; border:1px solid rgba(255,255,255,.08)}
 
-  footer{padding:10px;text-align:center;color:var(--muted);font-size:12px}
+  footer{padding:10px; text-align:center; color:var(--muted); font-size:12px}
   a{color:var(--ok)}
 </style>
 
@@ -94,98 +92,84 @@
 />
 </head>
 <body>
-  <header>
-    <h1>🚗 Parked Car Locator</h1>
-    <div class="sub">Save where you parked, then get distance, direction, map & notes.</div>
-  </header>
+<header>
+  <h1>🚗 Parked Car Locator</h1>
+  <div class="sub">Save where you parked, then get distance, direction, map & notes.</div>
+</header>
 
-  <div id="map"></div>
+<div id="map"></div>
 
-  <div class="grid">
-    <section class="card stack" aria-label="Actions">
-      <div class="row">
-        <button id="btnLocate">📍 Update My Position</button>
-        <button id="btnPark">🅿️ Park Here</button>
-        <button id="btnRoute" class="secondary" disabled>🗺️ Route</button>
-        <button id="btnShare" class="secondary" disabled>🔗 Share</button>
-        <button id="btnClear" class="warn" disabled>🗑️ Clear</button>
-      </div>
+<div class="grid">
+  <section class="card stack" aria-label="Actions">
+    <div class="row">
+      <button id="btnLocate">📍 Update My Position</button>
+      <button id="btnPark">🅿️ Park Here</button>
+      <button id="btnRoute" class="secondary" disabled>🗺️ Route</button>
+      <button id="btnShare" class="secondary" disabled>🔗 Share</button>
+      <button id="btnClear" class="warn" disabled>🗑️ Clear</button>
+    </div>
 
-      <div class="kv">
-        <div class="muted">Status</div>
-        <div id="status">Waiting for location…</div>
-        <div class="muted">Distance</div>
-        <div><span id="distance" class="big">—</span> <span class="muted" id="units">m</span></div>
-        <div class="muted">Bearing</div>
-        <div id="bearing">—</div>
-        <div class="muted">Accuracy</div>
-        <div id="accuracy">—</div>
-        <div class="muted">Direction</div>
-        <div id="directionText">—</div>
-      </div>
+    <div class="kv">
+      <div class="muted">Status</div><div id="status">Waiting for location…</div>
+      <div class="muted">Distance</div><div><span id="distance" class="big">—</span> <span id="units" class="muted">m</span></div>
+      <div class="muted">Bearing</div><div id="bearing">—</div>
+      <div class="muted">Accuracy</div><div id="accuracy">—</div>
+      <div class="muted">Direction</div><div id="directionText">—</div>
+    </div>
 
-      <div class="compass">
-        <div class="needle" id="needle" title="Points toward your car"><div class="cap"></div></div>
-        <small class="muted">Rotate your phone. Arrow uses device compass; enable motion/compass permissions if prompted.</small>
-      </div>
+    <div class="compass">
+      <div class="needle" id="needle" title="TIP points toward your car"><div class="cap"></div></div>
+      <small class="muted">Arrow tip points directly toward your parked car. Rotate phone until arrow faces up to face your car.</small>
+    </div>
 
-      <div class="stack">
-        <label class="muted">Note (e.g., P2, Blue Zone, near elevator)</label>
-        <input type="text" id="note" placeholder="Optional note about the spot" />
-        <label class="muted">Photo (optional)</label>
-        <input type="file" id="photo" accept="image/*" capture="environment" />
-        <img id="photoPreview" class="photo-preview" alt="Photo preview" hidden>
-      </div>
+    <div class="stack">
+      <label class="muted">Note (e.g., P2, Blue Zone, near elevator)</label>
+      <input type="text" id="note" placeholder="Optional note about the spot" />
+      <label class="muted">Photo (optional)</label>
+      <input type="file" id="photo" accept="image/*" capture="environment" />
+      <img id="photoPreview" class="photo-preview" alt="Photo preview" hidden>
+    </div>
 
-      <div class="row">
-        <label class="muted" for="mins">Parking timer:</label>
-        <input type="number" id="mins" min="0" step="5" value="0" style="width:120px" />
-        <button id="btnStartTimer" class="secondary">Start/Update</button>
-        <span class="muted" id="timerText">No timer set.</span>
-      </div>
-    </section>
+    <div class="row">
+      <label class="muted" for="mins">Parking timer:</label>
+      <input type="number" id="mins" min="0" step="5" value="0" style="width:120px" />
+      <button id="btnStartTimer" class="secondary">Start/Update</button>
+      <span class="muted" id="timerText">No timer set.</span>
+    </div>
+  </section>
 
-    <section class="card stack" aria-label="Saved details">
-      <div class="kv">
-        <div class="muted">Last parked</div>
-        <div id="parkedAt">—</div>
-        <div class="muted">Coordinates</div>
-        <div id="coords">—</div>
-        <div class="muted">Saved note</div>
-        <div id="savedNote">—</div>
-      </div>
-      <div id="savedPhotoWrap" class="stack" hidden>
-        <label class="muted">Saved photo</label>
-        <img id="savedPhoto" class="photo-preview" alt="Saved parking photo" />
-      </div>
-      <small class="muted">Tips: Works best on HTTPS (for GPS & compass). If map tiles don’t load (offline), distance/arrow still work.</small>
-    </section>
-  </div>
+  <section class="card stack" aria-label="Saved details">
+    <div class="kv">
+      <div class="muted">Last parked</div><div id="parkedAt">—</div>
+      <div class="muted">Coordinates</div><div id="coords">—</div>
+      <div class="muted">Saved note</div><div id="savedNote">—</div>
+    </div>
+    <div id="savedPhotoWrap" class="stack" hidden>
+      <label class="muted">Saved photo</label>
+      <img id="savedPhoto" class="photo-preview" alt="Saved parking photo" />
+    </div>
+    <small class="muted">Tips: Works best on HTTPS (for GPS & compass). If map tiles don’t load (offline), distance/arrow still work.</small>
+  </section>
+</div>
 
-  <footer>
-    © <span id="yr"></span> Parked Car Locator • v1.8
-  </footer>
+<footer>© <span id="yr"></span> Parked Car Locator • v1.8a</footer>
 
-  <!-- Leaflet JS (CDN) -->
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
 
 <script>
 /* =========================
    Single-file PWA bootstrap
    ========================= */
-// Create an inline manifest (with data-URI icons) and attach it
+// Create an inline manifest (with SVG data-URI icons) and attach it
 (function attachManifest(){
-  // Simple blue pin+car SVG rendered as data URIs for 192 & 512 (browsers accept SVG in manifest)
   const svgIcon = (size)=>`data:image/svg+xml;charset=utf-8,` + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
-      <defs><style>
-        .a{fill:#1462ff}
-        .b{fill:#ffffff}
-      </style></defs>
+      <defs><style>.a{fill:#1462ff}.b{fill:#ffffff}</style></defs>
       <path class="a" d="M256 40c115 0 208 93 208 208 0 119-170 260-201 285a15 15 0 0 1-14 0C218 508 48 367 48 248 48 133 141 40 256 40z"/>
       <circle cx="256" cy="210" r="132" fill="#fff" opacity="0.92"/>
       <path class="a" d="M346 260h-10l-10-30c-5-13-15-22-29-22H215c-14 0-23 9-28 22l-11 30h-10c-9 0-16 7-16 16v38c0 9 7 16 16 16h12a22 22 0 0 0 44 0h90a22 22 0 0 0 44 0h12c9 0 16-7 16-16v-38c0-9-7-16-16-16zM214 250a18 18 0 1 1 0 36 18 18 0 0 1 0-36zm84 0a18 18 0 1 1 0 36 18 18 0 0 1 0-36zM206 198l10-23c2-5 7-9 13-9h54c6 0 11 4 13 9l10 23H206z"/>
@@ -206,14 +190,13 @@
     ]
   };
   const blob = new Blob([JSON.stringify(manifest)], {type:"application/manifest+json"});
-  const url = URL.createObjectURL(blob);
-  document.getElementById('manifestLink').setAttribute('href', url);
+  document.getElementById('manifestLink').setAttribute('href', URL.createObjectURL(blob));
 })();
 
 // Register a minimal service worker from a Blob (cache this file only)
 if ('serviceWorker' in navigator) {
   const swCode = `
-    const CACHE = "car-locator-v1-8";
+    const CACHE = "car-locator-v1-8a";
     self.addEventListener("install", e=>{
       e.waitUntil(caches.open(CACHE).then(c=>c.addAll(["./"])).then(()=>self.skipWaiting()));
     });
@@ -226,14 +209,13 @@ if ('serviceWorker' in navigator) {
     });
   `;
   const swBlob = new Blob([swCode], {type:"text/javascript"});
-  const swUrl = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl);
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob));
 }
 </script>
 
 <script>
 /* =========================
-   Core app logic (v1.8)
+   Core app logic (v1.8a)
    ========================= */
 const $ = (s)=>document.querySelector(s);
 const fmt = (n)=> new Intl.NumberFormat(undefined, {maximumFractionDigits: n>=1000?0:1}).format(n);
@@ -373,27 +355,31 @@ function updateDistanceAndBearing(){
 function rotateNeedle(deviceHeading){
   const el = $('#needle');
   if(desiredBearing==null){ el.style.transform='rotate(0deg)'; return; }
+  // Normalize: deviceHeading is degrees CW from north (0..360).
+  // Rotate so the TIP (top) points toward the car relative to how you’re facing.
   let rot = desiredBearing;
   if(typeof deviceHeading === 'number' && !Number.isNaN(deviceHeading)) {
     rot = (desiredBearing - deviceHeading + 360)%360;
   }
   el.style.transform = `rotate(${rot}deg)`;
-  // Direction text helper
+
+  // Direction text
   const diff = (typeof deviceHeading==='number') ? (desiredBearing - deviceHeading + 360)%360 : desiredBearing;
   let txt='Straight ahead';
   if (diff < 15 || diff > 345) txt='Straight ahead';
   else if (diff < 60) txt='Turn right';
   else if (diff < 120) txt='Due right';
-  else if (diff < 165) txt='Turn back-right';
-  else if (diff < 195) txt='Behind you';
-  else if (diff < 240) txt='Turn back-left';
+  else if (diff < 165) txt='Back-right';
+  else if (diff < 195) txt='Behind';
+  else if (diff < 240) txt='Back-left';
   else if (diff < 300) txt='Due left';
   else txt='Turn left';
   $('#directionText').textContent = txt;
 }
 
 async function enableCompass(){
-  const needsPerm = typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
+  const needsPerm = typeof DeviceOrientationEvent !== 'undefined'
+                 && typeof DeviceOrientationEvent.requestPermission === 'function';
   try{
     if(needsPerm){
       const r = await DeviceOrientationEvent.requestPermission();
@@ -401,7 +387,10 @@ async function enableCompass(){
     }
   }catch{}
   const onOri = e=>{
-    const heading = (typeof e.alpha === 'number') ? (360 - e.alpha) % 360 : null;
+    // Prefer webkitCompassHeading if available (iOS gives absolute heading directly)
+    let heading = null;
+    if (typeof e.webkitCompassHeading === 'number') heading = e.webkitCompassHeading; // 0..360 CW from North
+    else if (typeof e.alpha === 'number')          heading = (360 - e.alpha) % 360;   // convert to compass heading
     rotateNeedle(heading);
   };
   window.addEventListener('deviceorientationabsolute', onOri);
@@ -415,9 +404,8 @@ function openRoute(){
   window.open(url, '_blank');
 }
 
-/* >>> v1.8: Always use the latest stored coordinates at share time <<< */
+/* Always use the latest stored coordinates at share time to avoid stale values */
 async function shareLoc(){
-  // Re-read from storage to avoid stale coordinates
   const latest = store.get();
   if(latest && typeof latest.lat==='number' && typeof latest.lng==='number'){
     parked = latest; // sync in-memory copy too
@@ -426,8 +414,7 @@ async function shareLoc(){
   const text = `My parked car at ${parked.lat.toFixed(6)}, ${parked.lng.toFixed(6)}${parked.note? ' — '+parked.note:''}`;
   const url = `https://maps.google.com/?q=${parked.lat},${parked.lng}`;
   if(navigator.share){
-    try{ await navigator.share({title:'Parked Car', text, url}); }
-    catch(e){ /* user cancelled */ }
+    try{ await navigator.share({title:'Parked Car', text, url}); }catch(e){ /* user cancelled */ }
   } else {
     prompt('Copy link:', `${text}\n${url}`);
   }
@@ -440,7 +427,8 @@ function startTimer(){
   if(!parked){ alert('Save a parked location first.'); return; }
   if(!Number.isFinite(mins) || mins<=0){
     parked.timer=null; store.set(parked); $('#timerText').textContent='No timer set.';
-    if(timerInterval) clearInterval(timerInterval); return;
+    if(timerInterval) clearInterval(timerInterval);
+    return;
   }
   const now = Date.now();
   parked.timer = {start: now, minutes: mins};
@@ -458,7 +446,7 @@ function updateTimerText(){
   if(rem<=0 && timerInterval){ clearInterval(timerInterval); timerInterval=null; alert('Parking timer finished.'); }
 }
 
-// Events
+// Init & Events
 window.addEventListener('load', ()=>{
   $('#yr').textContent = new Date().getFullYear();
   initMap();
@@ -467,7 +455,7 @@ window.addEventListener('load', ()=>{
 
   if(parked){
     refreshSavedUI();
-    $('#btnRoute').disabled = false; $('#btnShare').disabled = false; $('#btnClear').disabled = false;
+    ['btnRoute','btnShare','btnClear'].forEach(id=>$('#'+id).disabled=false);
     parkedMarker.setLatLng([parked.lat, parked.lng]).addTo(map);
     updateTimerText();
   }
