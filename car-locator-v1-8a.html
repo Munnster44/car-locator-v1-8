@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Parked Car Locator v1.8a (Single-file)</title>
+
+<!-- Inline manifest will be attached at runtime -->
+<link id="manifestLink" rel="manifest" href="data:application/json,{}">
+
+<style>
+  :root{
+    --bg:#0b1220;          /* deep navy */
+    --card:#141c2b;
+    --muted:#9fb0c3;
+    --accent:#5bbcff;     /* cyan */
+    --accent-2:#8effa3;   /* lime */
+    --danger:#ff6b6b;
+    --ok:#89ffef;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:#eaf2ff;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    display:flex; flex-direction:column;
+  }
+  header{
+    text-align:center; padding:12px 12px 4px; position:sticky; top:0; z-index:1000;
+    background:linear-gradient(180deg, rgba(11,18,32,.98), rgba(11,18,32,.92));
+    border-bottom:1px solid rgba(255,255,255,.08);
+    backdrop-filter:blur(6px);
+  }
+  h1{font-size:20px; margin:6px 0 2px}
+  .sub{font-size:12px; color:var(--muted)}
+  #map{height:46vh; min-height:260px; width:100%}
+
+  .grid{display:grid; gap:10px; padding:12px}
+  @media(min-width:760px){ .grid{grid-template-columns:1.2fr 1fr} #map{height:55vh} }
+
+  .card{background:var(--card); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px}
+  .row{display:flex; gap:10px; flex-wrap:wrap}
+  button, input[type="number"], input[type="text"], textarea{
+    font:inherit; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#0e1624; color:#eaf2ff; padding:10px 12px;
+  }
+  button{cursor:pointer; border-color:transparent; background:linear-gradient(180deg,#1b8fff,#1462ff); box-shadow:0 6px 20px rgba(20,98,255,.25)}
+  button.secondary{background:#12223a; border:1px solid rgba(255,255,255,.12); box-shadow:none}
+  button.warn{background:linear-gradient(180deg,#ff7b7b,#e05252)}
+  button:disabled{opacity:.6; cursor:not-allowed}
+
+  .stack{display:grid; gap:8px}
+  .kv{display:grid; grid-template-columns:140px 1fr; gap:6px; align-items:center}
+  .muted{color:var(--muted)}
+  .big{font-size:28px; font-weight:700}
+
+  /* Compass — improved visibility */
+  .compass{display:flex; flex-direction:column; align-items:center; gap:8px}
+  .needle{
+    width:64px; height:64px; border-radius:50%;
+    position:relative; display:inline-grid; place-items:center;
+    background:#0f1a2b; border:2px solid rgba(255,255,255,.25);
+    box-shadow:0 0 0 4px rgba(20,98,255,.25), 0 8px 30px rgba(20,98,255,.35);
+  }
+  .needle::before{
+    content:""; position:absolute; width:80%; height:80%; border-radius:50%;
+    background:radial-gradient(circle at 50% 55%, rgba(255,255,255,.12), rgba(255,255,255,0) 60%);
+    z-index:0;
+  }
+  .needle::after{ /* TIP points toward your car */
+    content:""; width:4px; height:28px; background:var(--accent-2);
+    position:absolute; top:6px; left:50%; transform:translateX(-50%);
+    border-radius:2px; box-shadow:0 0 10px rgba(142,255,163,.5);
+  }
+  .needle .cap{
+    position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+    width:10px; height:10px; border-radius:50%; background:#fff;
+    box-shadow:0 0 8px rgba(255,255,255,.6);
+  }
+
+  .photo-preview{max-width:100%; max-height:180px; display:block; margin-top:6px; border-radius:10px; border:1px solid rgba(255,255,255,.08)}
+
+  footer{padding:10px; text-align:center; color:var(--muted); font-size:12px}
+  a{color:var(--ok)}
+</style>
+
+<!-- Leaflet CSS (CDN) -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+</head>
+<body>
+<header>
+  <h1>🚗 Parked Car Locator</h1>
+  <div class="sub">Save where you parked, then get distance, direction, map & notes.</div>
+</header>
+
+<div id="map"></div>
+
+<div class="grid">
+  <section class="card stack" aria-label="Actions">
+    <div class="row">
+      <button id="btnLocate">📍 Update My Position</button>
+      <button id="btnPark">🅿️ Park Here</button>
+      <button id="btnRoute" class="secondary" disabled>🗺️ Route</button>
+      <button id="btnShare" class="secondary" disabled>🔗 Share</button>
+      <button id="btnClear" class="warn" disabled>🗑️ Clear</button>
+    </div>
+
+    <div class="kv">
+      <div class="muted">Status</div><div id="status">Waiting for location…</div>
+      <div class="muted">Distance</div><div><span id="distance" class="big">—</span> <span id="units" class="muted">m</span></div>
+      <div class="muted">Bearing</div><div id="bearing">—</div>
+      <div class="muted">Accuracy</div><div id="accuracy">—</div>
+      <div class="muted">Direction</div><div id="directionText">—</div>
+    </div>
+
+    <div class="compass">
+      <div class="needle" id="needle" title="TIP points toward your car"><div class="cap"></div></div>
+      <small class="muted">Arrow tip points directly toward your parked car. Rotate phone until arrow faces up to face your car.</small>
+    </div>
+
+    <div class="stack">
+      <label class="muted">Note (e.g., P2, Blue Zone, near elevator)</label>
+      <input type="text" id="note" placeholder="Optional note about the spot" />
+      <label class="muted">Photo (optional)</label>
+      <input type="file" id="photo" accept="image/*" capture="environment" />
+      <img id="photoPreview" class="photo-preview" alt="Photo preview" hidden>
+    </div>
+
+    <div class="row">
+      <label class="muted" for="mins">Parking timer:</label>
+      <input type="number" id="mins" min="0" step="5" value="0" style="width:120px" />
+      <button id="btnStartTimer" class="secondary">Start/Update</button>
+      <span class="muted" id="timerText">No timer set.</span>
+    </div>
+  </section>
+
+  <section class="card stack" aria-label="Saved details">
+    <div class="kv">
+      <div class="muted">Last parked</div><div id="parkedAt">—</div>
+      <div class="muted">Coordinates</div><div id="coords">—</div>
+      <div class="muted">Saved note</div><div id="savedNote">—</div>
+    </div>
+    <div id="savedPhotoWrap" class="stack" hidden>
+      <label class="muted">Saved photo</label>
+      <img id="savedPhoto" class="photo-preview" alt="Saved parking photo" />
+    </div>
+    <small class="muted">Tips: Works best on HTTPS (for GPS & compass). If map tiles don’t load (offline), distance/arrow still work.</small>
+  </section>
+</div>
+
+<footer>© <span id="yr"></span> Parked Car Locator • v1.8a</footer>
+
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+
+<script>
+/* =========================
+   Single-file PWA bootstrap
+   ========================= */
+// Create an inline manifest (with SVG data-URI icons) and attach it
+(function attachManifest(){
+  const svgIcon = (size)=>`data:image/svg+xml;charset=utf-8,` + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+      <defs><style>.a{fill:#1462ff}.b{fill:#ffffff}</style></defs>
+      <path class="a" d="M256 40c115 0 208 93 208 208 0 119-170 260-201 285a15 15 0 0 1-14 0C218 508 48 367 48 248 48 133 141 40 256 40z"/>
+      <circle cx="256" cy="210" r="132" fill="#fff" opacity="0.92"/>
+      <path class="a" d="M346 260h-10l-10-30c-5-13-15-22-29-22H215c-14 0-23 9-28 22l-11 30h-10c-9 0-16 7-16 16v38c0 9 7 16 16 16h12a22 22 0 0 0 44 0h90a22 22 0 0 0 44 0h12c9 0 16-7 16-16v-38c0-9-7-16-16-16zM214 250a18 18 0 1 1 0 36 18 18 0 0 1 0-36zm84 0a18 18 0 1 1 0 36 18 18 0 0 1 0-36zM206 198l10-23c2-5 7-9 13-9h54c6 0 11 4 13 9l10 23H206z"/>
+    </svg>`
+  );
+
+  const manifest = {
+    name: "Parked Car Locator",
+    short_name: "Car Locator",
+    start_url: ".",
+    display: "standalone",
+    background_color: "#0B1220",
+    theme_color: "#1462FF",
+    description: "Locate your parked car with GPS, compass guidance, notes, photo, timer, and offline support.",
+    icons: [
+      { src: svgIcon(192), sizes: "192x192", type: "image/svg+xml", purpose:"any maskable" },
+      { src: svgIcon(512), sizes: "512x512", type: "image/svg+xml", purpose:"any maskable" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:"application/manifest+json"});
+  document.getElementById('manifestLink').setAttribute('href', URL.createObjectURL(blob));
+})();
+
+// Register a minimal service worker from a Blob (cache this file only)
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = "car-locator-v1-8a";
+    self.addEventListener("install", e=>{
+      e.waitUntil(caches.open(CACHE).then(c=>c.addAll(["./"])).then(()=>self.skipWaiting()));
+    });
+    self.addEventListener("activate", e=>{
+      e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>k===CACHE?null:caches.delete(k)))));
+      self.clients.claim();
+    });
+    self.addEventListener("fetch", e=>{
+      e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));
+    });
+  `;
+  const swBlob = new Blob([swCode], {type:"text/javascript"});
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob));
+}
+</script>
+
+<script>
+/* =========================
+   Core app logic (v1.8a)
+   ========================= */
+const $ = (s)=>document.querySelector(s);
+const fmt = (n)=> new Intl.NumberFormat(undefined, {maximumFractionDigits: n>=1000?0:1}).format(n);
+const toRad = (d)=> d*Math.PI/180; const toDeg = (r)=> r*180/Math.PI;
+const haversine = (a,b)=>{ // meters
+  const R=6371e3; const dLat=toRad(b.lat-a.lat), dLon=toRad(b.lng-a.lng);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+};
+const initialBearing = (a,b)=>{ // degrees 0..360
+  const φ1=toRad(a.lat), φ2=toRad(b.lat), λ1=toRad(a.lng), λ2=toRad(b.lng);
+  const y=Math.sin(λ2-λ1)*Math.cos(φ2);
+  const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+  return (toDeg(Math.atan2(y,x))+360)%360;
+};
+const store = {
+  key:'parked_car_v1',
+  get(){ try{ return JSON.parse(localStorage.getItem(this.key)||'null'); }catch{ return null } },
+  set(v){ localStorage.setItem(this.key, JSON.stringify(v)); },
+  clear(){ localStorage.removeItem(this.key); }
+};
+
+// State
+let me = null; // {lat,lng,accuracy}
+let parked = store.get();
+let map, meMarker, parkedMarker, accuracyCircle;
+let desiredBearing = null; // bearing to car
+
+// Map
+function initMap(){
+  map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+  meMarker = L.marker([0,0], {title:'You'});
+  parkedMarker = L.marker([0,0], {title:'Car', opacity:0.95, draggable:false});
+  accuracyCircle = L.circle([0,0], {radius:5, weight:1, color:'#5bbcff', fillOpacity:0.08});
+  meMarker.addTo(map); accuracyCircle.addTo(map);
+  if(parked){ parkedMarker.addTo(map); }
+  fitView();
+}
+
+function fitView(){
+  const layers=[];
+  if(me){ layers.push([me.lat, me.lng]); }
+  if(parked){ layers.push([parked.lat, parked.lng]); }
+  if(layers.length){ map.fitBounds(layers, {padding:[40,40]}); }
+  else{ map.setView([43.6532,-79.3832], 13); } // Toronto fallback
+}
+
+// Geolocation
+function setStatus(t){ $('#status').textContent = t; }
+
+function locate(){
+  setStatus('Locating…');
+  if(!('geolocation' in navigator)) return setStatus('Geolocation not supported');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    me = {lat,lng,accuracy};
+    meMarker.setLatLng([lat,lng]);
+    accuracyCircle.setLatLng([lat,lng]).setRadius(accuracy||10);
+    $('#accuracy').textContent = typeof accuracy==='number' ? ('±'+accuracy.toFixed(1)+' m') : '—';
+    setStatus('Location updated.');
+    updateDistanceAndBearing();
+    if(!parked) map.setView([lat,lng], Math.max(map.getZoom(), 16));
+  }, err=>{
+    setStatus('Location error: ' + err.message);
+  }, {enableHighAccuracy:true, timeout:15000, maximumAge:10000});
+}
+
+// Parking
+function parkHere(){
+  if(!me){ alert('Get your current position first.'); return; }
+  const note = $('#note').value.trim();
+  const photoEl = $('#photo');
+  const now = new Date().toISOString();
+
+  const save = (photoData)=>{
+    parked = {lat:me.lat, lng:me.lng, at:now, note:note||null, photo:photoData||null, timer:null};
+    store.set(parked);
+    parkedMarker.addTo(map).setLatLng([parked.lat, parked.lng]);
+    refreshSavedUI();
+    setStatus('Parked location saved.');
+    updateDistanceAndBearing();
+    $('#btnRoute').disabled = false;
+    $('#btnShare').disabled = false;
+    $('#btnClear').disabled = false;
+  };
+
+  if(photoEl.files && photoEl.files[0]){
+    const file = photoEl.files[0];
+    const reader = new FileReader();
+    reader.onload = ()=> save(reader.result);
+    reader.onerror = ()=> save(null);
+    reader.readAsDataURL(file);
+  } else save(null);
+}
+
+function clearParking(){
+  if(!parked){ return; }
+  if(!confirm('Clear saved parking location?')) return;
+  store.clear(); parked = null; desiredBearing=null;
+  $('#parkedAt').textContent = '—';
+  $('#coords').textContent = '—';
+  $('#savedNote').textContent = '—';
+  $('#savedPhotoWrap').hidden = true;
+  $('#btnRoute').disabled = true; $('#btnShare').disabled = true; $('#btnClear').disabled = true;
+  if(map && parkedMarker){ parkedMarker.remove(); }
+  setStatus('Cleared.');
+  updateDistanceAndBearing();
+  fitView();
+}
+
+function refreshSavedUI(){
+  if(!parked){ return; }
+  const dt = new Date(parked.at);
+  $('#parkedAt').textContent = dt.toLocaleString();
+  $('#coords').textContent = `${parked.lat.toFixed(6)}, ${parked.lng.toFixed(6)}`;
+  $('#savedNote').textContent = parked.note || '—';
+  if(parked.photo){ $('#savedPhoto').src = parked.photo; $('#savedPhotoWrap').hidden = false; }
+  else { $('#savedPhotoWrap').hidden = true; }
+}
+
+// Distance / Bearing / Compass
+function updateDistanceAndBearing(){
+  if(me && parked){
+    const d = haversine(me, parked); // meters
+    $('#distance').textContent = d>1000? fmt(d/1000): fmt(d);
+    $('#units').textContent = d>1000? 'km':'m';
+    const brg = initialBearing(me, parked);
+    $('#bearing').textContent = Math.round(brg) + '°';
+    desiredBearing = brg;
+  } else { $('#distance').textContent = '—'; $('#bearing').textContent='—'; }
+  rotateNeedle();
+}
+
+function rotateNeedle(deviceHeading){
+  const el = $('#needle');
+  if(desiredBearing==null){ el.style.transform='rotate(0deg)'; return; }
+  // Normalize: deviceHeading is degrees CW from north (0..360).
+  // Rotate so the TIP (top) points toward the car relative to how you’re facing.
+  let rot = desiredBearing;
+  if(typeof deviceHeading === 'number' && !Number.isNaN(deviceHeading)) {
+    rot = (desiredBearing - deviceHeading + 360)%360;
+  }
+  el.style.transform = `rotate(${rot}deg)`;
+
+  // Direction text
+  const diff = (typeof deviceHeading==='number') ? (desiredBearing - deviceHeading + 360)%360 : desiredBearing;
+  let txt='Straight ahead';
+  if (diff < 15 || diff > 345) txt='Straight ahead';
+  else if (diff < 60) txt='Turn right';
+  else if (diff < 120) txt='Due right';
+  else if (diff < 165) txt='Back-right';
+  else if (diff < 195) txt='Behind';
+  else if (diff < 240) txt='Back-left';
+  else if (diff < 300) txt='Due left';
+  else txt='Turn left';
+  $('#directionText').textContent = txt;
+}
+
+async function enableCompass(){
+  const needsPerm = typeof DeviceOrientationEvent !== 'undefined'
+                 && typeof DeviceOrientationEvent.requestPermission === 'function';
+  try{
+    if(needsPerm){
+      const r = await DeviceOrientationEvent.requestPermission();
+      if(r !== 'granted'){ return; }
+    }
+  }catch{}
+  const onOri = e=>{
+    // Prefer webkitCompassHeading if available (iOS gives absolute heading directly)
+    let heading = null;
+    if (typeof e.webkitCompassHeading === 'number') heading = e.webkitCompassHeading; // 0..360 CW from North
+    else if (typeof e.alpha === 'number')          heading = (360 - e.alpha) % 360;   // convert to compass heading
+    rotateNeedle(heading);
+  };
+  window.addEventListener('deviceorientationabsolute', onOri);
+  window.addEventListener('deviceorientation', onOri);
+}
+
+// Routes & Share
+function openRoute(){
+  if(!parked) return;
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${parked.lat},${parked.lng}`;
+  window.open(url, '_blank');
+}
+
+/* Always use the latest stored coordinates at share time to avoid stale values */
+async function shareLoc(){
+  const latest = store.get();
+  if(latest && typeof latest.lat==='number' && typeof latest.lng==='number'){
+    parked = latest; // sync in-memory copy too
+  }
+  if(!parked) return;
+  const text = `My parked car at ${parked.lat.toFixed(6)}, ${parked.lng.toFixed(6)}${parked.note? ' — '+parked.note:''}`;
+  const url = `https://maps.google.com/?q=${parked.lat},${parked.lng}`;
+  if(navigator.share){
+    try{ await navigator.share({title:'Parked Car', text, url}); }catch(e){ /* user cancelled */ }
+  } else {
+    prompt('Copy link:', `${text}\n${url}`);
+  }
+}
+
+// Timer
+let timerInterval = null;
+function startTimer(){
+  const mins = parseInt($('#mins').value,10);
+  if(!parked){ alert('Save a parked location first.'); return; }
+  if(!Number.isFinite(mins) || mins<=0){
+    parked.timer=null; store.set(parked); $('#timerText').textContent='No timer set.';
+    if(timerInterval) clearInterval(timerInterval);
+    return;
+  }
+  const now = Date.now();
+  parked.timer = {start: now, minutes: mins};
+  store.set(parked);
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimerText, 1000);
+  updateTimerText();
+}
+function updateTimerText(){
+  if(!parked || !parked.timer){ $('#timerText').textContent='No timer set.'; return; }
+  const end = parked.timer.start + parked.timer.minutes*60000;
+  const rem = Math.max(0, end - Date.now());
+  const mm = Math.floor(rem/60000), ss = Math.floor((rem%60000)/1000);
+  $('#timerText').textContent = rem>0 ? `Time left: ${mm}:${String(ss).padStart(2,'0')}` : '⏰ Timer finished';
+  if(rem<=0 && timerInterval){ clearInterval(timerInterval); timerInterval=null; alert('Parking timer finished.'); }
+}
+
+// Init & Events
+window.addEventListener('load', ()=>{
+  $('#yr').textContent = new Date().getFullYear();
+  initMap();
+  locate();
+  enableCompass();
+
+  if(parked){
+    refreshSavedUI();
+    ['btnRoute','btnShare','btnClear'].forEach(id=>$('#'+id).disabled=false);
+    parkedMarker.setLatLng([parked.lat, parked.lng]).addTo(map);
+    updateTimerText();
+  }
+
+  $('#btnLocate').addEventListener('click', locate);
+  $('#btnPark').addEventListener('click', parkHere);
+  $('#btnRoute').addEventListener('click', openRoute);
+  $('#btnShare').addEventListener('click', shareLoc);
+  $('#btnClear').addEventListener('click', clearParking);
+  $('#btnStartTimer').addEventListener('click', startTimer);
+
+  // Photo preview
+  $('#photo').addEventListener('change', (e)=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f){ $('#photoPreview').hidden=true; return; }
+    const reader = new FileReader();
+    reader.onload = ()=>{ $('#photoPreview').src=reader.result; $('#photoPreview').hidden=false; };
+    reader.readAsDataURL(f);
+  });
+
+  // Recompute periodically (in case you walk)
+  setInterval(()=>{ if(me) updateDistanceAndBearing(); }, 4000);
+});
+</script>
+</body>
+</html>
